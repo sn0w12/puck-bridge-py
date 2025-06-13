@@ -134,8 +134,13 @@ def start_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
     event_system = EventSystem()
     message_parser = MessageParser(game_state_manager, event_system)
 
-    # Set up signal handler
-    signal.signal(signal.SIGINT, signal_handler)
+    # Only set up signal handler if we're in the main thread
+    try:
+        signal.signal(signal.SIGINT, signal_handler)
+        logger.info("Signal handler registered")
+    except ValueError as e:
+        logger.warning(f"Could not register signal handler: {e}")
+        logger.info("Signal handling disabled - use external shutdown mechanism")
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -158,6 +163,13 @@ def start_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT):
                 break
 
         logger.info("Server shutdown complete")
+
+
+def shutdown_server():
+    """Manually trigger server shutdown"""
+    global shutdown_flag
+    shutdown_flag = True
+    logger.info("Server shutdown triggered")
 
 
 if __name__ == "__main__":
