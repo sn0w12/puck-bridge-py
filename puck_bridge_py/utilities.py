@@ -204,3 +204,89 @@ def find_players_by_partial_name(partial_name: str) -> List[Player]:
     players = get_all_players()
     partial_lower = partial_name.lower()
     return [player for player in players.values() if partial_lower in player.username.lower()]
+
+
+def register_full_state_handler(handler):
+    """
+    Register a handler that receives the complete game state whenever anything changes.
+
+    The handler will be called with a dictionary containing:
+    - game_state: Current game phase, time, period, scores
+    - players: Dictionary of all players by client_id
+    - performance: Current FPS and performance metrics
+    - summary: High-level game summary
+
+    Args:
+        handler: Function that accepts (state_dict) as parameter
+    """
+    from .server import register_message_handler
+
+    def full_state_wrapper(message_type, data):
+        full_state = get_complete_game_state()
+        full_state["message_type"] = message_type
+        handler(full_state)
+
+    # Register for all message types that could change game state
+    state_changing_messages = [
+        "game_state",
+        "player_spawned",
+        "player_despawned",
+        "player_updated",
+        "goal_scored",
+        "performance_update",
+    ]
+
+    for msg_type in state_changing_messages:
+        register_message_handler(msg_type, lambda mt=msg_type, d=None: full_state_wrapper(mt, d))
+
+
+def get_complete_game_state() -> dict:
+    """
+    Get the complete current game state as a dictionary.
+
+    Returns:
+        Dictionary containing all game state, players, and performance data
+    """
+    game_state = get_game_state()
+    if not game_state:
+        return {"game_state": None, "players": {}, "performance": None, "summary": None, "connected": False}
+
+    return {
+        "game_state": {
+            "phase": game_state.game_state.phase,
+            "time": game_state.game_state.time,
+            "period": game_state.game_state.period,
+            "blue_score": game_state.game_state.blue_score,
+            "red_score": game_state.game_state.red_score,
+            "last_updated": game_state.game_state.last_updated.isoformat(),
+        },
+        "players": {
+            str(client_id): {
+                "client_id": player.client_id,
+                "username": player.username,
+                "state": player.state,
+                "team": player.team,
+                "role": player.role,
+                "number": player.number,
+                "goals": player.goals,
+                "assists": player.assists,
+                "ping": player.ping,
+                "handedness": player.handedness,
+                "country": player.country,
+                "steam_id": player.steam_id,
+                "patreon_level": player.patreon_level,
+                "admin_level": player.admin_level,
+                "last_updated": player.last_updated.isoformat(),
+            }
+            for client_id, player in game_state.players.items()
+        },
+        "performance": {
+            "current_fps": game_state.performance.current_fps,
+            "average_fps": game_state.performance.average_fps,
+            "min_fps": game_state.performance.min_fps,
+            "max_fps": game_state.performance.max_fps,
+            "last_updated": game_state.performance.last_updated.isoformat(),
+        },
+        "summary": game_state.get_game_summary(),
+        "connected": is_connected(),
+    }

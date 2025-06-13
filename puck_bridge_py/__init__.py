@@ -47,6 +47,8 @@ from .utilities import (
     register_game_state_handler,
     get_player_steam_ids,
     find_players_by_partial_name,
+    register_full_state_handler,
+    get_complete_game_state,
 )
 
 __all__ = [
@@ -99,4 +101,6 @@ __all__ = [
     "register_game_state_handler",
     "get_player_steam_ids",
     "find_players_by_partial_name",
+    "register_full_state_handler",
+    "get_complete_game_state",
 ]
