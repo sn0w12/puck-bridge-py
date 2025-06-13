@@ -2,7 +2,7 @@
 name = "puck-bridge-py"
 version = "0.1.0"
 description = "Python library for connecting to and interacting with Puck (hockey game) servers"
-authors = [{ name = "sn0w12", email = "your@email.com" }]
+authors = [{ name = "sn0w12", email = "lucasskold49@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.7"
 license = { text = "MIT" }
