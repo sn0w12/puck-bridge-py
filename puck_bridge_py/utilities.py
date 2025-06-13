@@ -162,6 +162,38 @@ class Utilities:
         """Check if connected to the game server"""
         return self.bridge.is_connected()
 
+    def register_full_state_handler(self, handler):
+        """
+        Register a handler that receives the complete game state whenever anything changes.
+
+        The handler will be called with a dictionary containing:
+        - game_state: Current game phase, time, period, scores
+        - players: Dictionary of all players by client_id
+        - performance: Current FPS and performance metrics
+        - summary: High-level game summary
+
+        Args:
+            handler: Function that accepts (state_dict) as parameter
+        """
+
+        def full_state_wrapper(message_type, data):
+            full_state = self.get_complete_game_state()
+            full_state["message_type"] = message_type
+            handler(full_state)
+
+        # Register for all message types that could change game state
+        state_changing_messages = [
+            "game_state",
+            "player_spawned",
+            "player_despawned",
+            "player_updated",
+            "goal_scored",
+            "performance_update",
+        ]
+
+        for msg_type in state_changing_messages:
+            self.bridge.register_message_handler(msg_type, lambda mt=msg_type, d=None: full_state_wrapper(mt, d))
+
     def get_complete_game_state(self) -> dict:
         """Get the complete current game state as a dictionary"""
         game_state = self.bridge.get_game_state()
