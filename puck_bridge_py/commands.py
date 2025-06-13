@@ -3,8 +3,6 @@ Command utilities for sending commands to the Puck Bridge server.
 """
 
 import logging
-from typing import Optional
-from .server import send_command
 
 logger = logging.getLogger(__name__)
 

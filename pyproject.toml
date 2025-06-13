@@ -1,6 +1,6 @@
 [project]
 name = "puck-bridge-py"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python library for connecting to and interacting with Puck servers"
 authors = [{ name = "sn0w12", email = "lucasskold49@gmail.com" }]
 readme = "README.md"

@@ -3,7 +3,6 @@ Utility functions for common Puck Bridge operations.
 """
 
 from typing import List, Dict, Optional
-from .server import get_game_state, is_connected as server_is_connected, register_message_handler
 from .game_state import Player
 
 
