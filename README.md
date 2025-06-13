@@ -12,6 +12,7 @@ A Python library for connecting to and interacting with [Puck](https://store.ste
 -   Server administration commands
 -   Performance metrics and FPS monitoring
 -   Easy-to-use utility functions
+-   **Supports multiple servers at once via instance-based API**
 
 ## Installation
 
@@ -27,24 +28,56 @@ cd puckbridge
 pip install -e .
 ```
 
-## Quick Start
+## Quick Start (Instance-based API)
 
 ```python
-from puck_bridge_py import start_server, register_goal_handler, get_current_score
+from puck_bridge_py import PuckBridge, Commands, Utilities
+
+bridge = PuckBridge(host="127.0.0.1", port=9000)
+bridge.start_server(blocking=True)
+
+commands = Commands(bridge)
+utilities = Utilities(bridge)
 
 def on_goal_scored(data):
     team = data.get("team", "unknown")
     player = data.get("players", {}).get("goal", {})
     player_name = player.get("username", "unknown")
-
     print(f"GOAL! {player_name} scored for {team}!")
-    print(f"Current score: {get_current_score()}")
+    print(f"Current score: {utilities.get_current_score()}")
 
-# Register the goal handler
-register_goal_handler(on_goal_scored)
+utilities.register_goal_handler(on_goal_scored)
+```
 
-# Start the server
-start_server()
+## Multi-Server Example
+
+You can run multiple servers at once, each with their own state and handlers:
+
+```python
+from puck_bridge_py import PuckBridge, Commands, Utilities
+
+bridge1 = PuckBridge(host="127.0.0.1", port=9000)
+bridge2 = PuckBridge(host="127.0.0.1", port=9001)
+
+bridge1.start_server(blocking=False)
+bridge2.start_server(blocking=False)
+
+commands1 = Commands(bridge1)
+utilities1 = Utilities(bridge1)
+
+commands2 = Commands(bridge2)
+utilities2 = Utilities(bridge2)
+
+def on_goal1(data):
+    print("Bridge1 goal:", data)
+utilities1.register_goal_handler(on_goal1)
+
+def on_goal2(data):
+    print("Bridge2 goal:", data)
+utilities2.register_goal_handler(on_goal2)
+
+commands1.send_system_message("Hello from server 1!")
+commands2.send_system_message("Hello from server 2!")
 ```
 
 ## Core Concepts
@@ -80,72 +113,75 @@ Register handlers for specific game events:
 
 ## API Reference
 
-### Core Functions
+### Instance-based API
 
 #### Server Management
 
 ```python
-start_server(host="127.0.0.1", port=9000)  # Start the Puck Bridge server with custom host/port
-is_connected() -> bool  # Check if connected to game
+bridge = PuckBridge(host="127.0.0.1", port=9000)
+bridge.start_server(blocking=True)  # or blocking=False for non-blocking
+bridge.is_connected()  # Check if connected to game
 ```
 
 #### Game State
 
 ```python
-get_game_state() -> GameStateManager  # Get game state manager
-get_current_score() -> Dict[str, int]  # Get current score
-get_game_phase() -> str  # Get game phase (None, Warmup, FaceOff, Playing, etc.)
-get_game_time() -> float  # Get current game time
-is_game_in_progress() -> bool  # Check if game is actively being played
-is_game_paused() -> bool  # Check if game is paused (warmup, period over)
-is_game_active() -> bool  # Check if game is active (not None or GameOver)
-is_period_over() -> bool  # Check if current period is over
-is_game_over() -> bool  # Check if game is completely finished
-is_warmup() -> bool  # Check if game is in warmup phase
-is_scoring_phase() -> bool  # Check if in scoring celebration phase
+game_state_mgr = bridge.get_game_state()
+utilities = Utilities(bridge)
+utilities.get_current_score()
+utilities.get_game_phase()
+utilities.get_game_time()
+utilities.is_game_in_progress()
+utilities.is_game_paused()
+utilities.is_game_active()
+utilities.is_period_over()
+utilities.is_game_over()
+utilities.is_warmup()
+utilities.is_scoring_phase()
 ```
 
 #### Player Management
 
 ```python
-get_all_players() -> Dict[int, Player]  # Get all players
-get_player_by_username(username: str) -> Player  # Find player by name
-get_blue_players() -> List[Player]  # Get blue team players
-get_red_players() -> List[Player]  # Get red team players
-get_top_scorers(limit=5) -> List[Player]  # Get top scoring players
+utilities.get_all_players()
+utilities.get_player_by_username(username)
+utilities.get_blue_players()
+utilities.get_red_players()
+utilities.get_top_scorers(limit=5)
 ```
 
 #### Team Information
 
 ```python
-get_team_balance() -> Dict[str, int]  # Get player count per team
-get_player_count() -> int  # Get total player count
+utilities.get_team_balance()
+utilities.get_player_count()
 ```
 
 #### Utilities
 
 ```python
-format_game_time(seconds: float) -> str  # Format time as MM:SS
-format_score_string() -> str  # Get formatted score string
-get_performance_stats() -> Dict[str, float]  # Get FPS and performance
+utilities.format_game_time(seconds)
+utilities.format_score_string()
+utilities.get_performance_stats()
 ```
 
 #### Event Registration
 
 ```python
-register_goal_handler(handler)  # Register goal event handler
-register_player_join_handler(handler)  # Register player join handler
-register_player_leave_handler(handler)  # Register player leave handler
-register_game_state_handler(handler)  # Register game state handler
+utilities.register_goal_handler(handler)
+utilities.register_player_join_handler(handler)
+utilities.register_player_leave_handler(handler)
+utilities.register_game_state_handler(handler)
 ```
 
 #### Commands
 
 ```python
-send_system_message(message: str) -> bool  # Send message to all players
-restart_game(reason: str) -> bool  # Restart the game
-kick_player(steam_id: str, reason: str) -> bool  # Kick player by Steam ID
-kick_player_by_name(username: str, reason: str) -> bool  # Kick by username
+commands = Commands(bridge)
+commands.send_system_message(message)
+commands.restart_game(reason)
+commands.kick_player(steam_id, reason)
+commands.kick_player_by_name(username, reason)
 ```
 
 ### Data Classes
@@ -204,19 +240,23 @@ class Performance:
 The server can be configured with custom host and port settings:
 
 ```python
-from puck_bridge_py import start_server
+from puck_bridge_py import PuckBridge
 
 # Default configuration (127.0.0.1:9000)
-start_server()
+bridge = PuckBridge()
+bridge.start_server()
 
 # Custom port
-start_server(port=9001)
+bridge = PuckBridge(port=9001)
+bridge.start_server()
 
 # Custom host and port
-start_server(host="0.0.0.0", port=8080)
+bridge = PuckBridge(host="0.0.0.0", port=8080)
+bridge.start_server()
 
 # Listen on all interfaces
-start_server(host="0.0.0.0")
+bridge = PuckBridge(host="0.0.0.0")
+bridge.start_server()
 ```
 
 **Default Settings:**
@@ -241,42 +281,39 @@ start_server(host="0.0.0.0")
 ```python
 import time
 import threading
-from puck_bridge_py import (
-    start_server,
-    get_current_score,
-    get_game_phase,
-    get_player_count,
-    format_game_time,
-    get_game_time,
-)
+from puck_bridge_py import PuckBridge, Utilities
+
+bridge = PuckBridge()
+utilities = Utilities(bridge)
 
 def monitor_game():
     while True:
-        if get_player_count() > 0:
-            phase = get_game_phase()
-            score = get_current_score()
-            time_str = format_game_time(get_game_time())
+        if utilities.get_player_count() > 0:
+            phase = utilities.get_game_phase()
+            score = utilities.get_current_score()
+            time_str = utilities.format_game_time(utilities.get_game_time())
 
             print(f"Phase: {phase} | Time: {time_str} | Score: Blue {score['blue']} - Red {score['red']}")
 
         time.sleep(10)
 
-# Start monitoring in background
 threading.Thread(target=monitor_game, daemon=True).start()
-start_server()
+bridge.start_server()
 ```
 
 ### Advanced Event Handling
 
 ```python
-from puck_bridge_py import *
+from puck_bridge_py import PuckBridge, Utilities
+
+bridge = PuckBridge()
+utilities = Utilities(bridge)
 
 def on_goal_scored(data):
     team = data.get("team")
     players = data.get("players", {})
     scorer = players.get("goal", {}).get("username", "Unknown")
 
-    # Get assists
     assists = []
     for assist_key in ["assist1", "assist2"]:
         if assist_key in players:
@@ -286,8 +323,7 @@ def on_goal_scored(data):
     if assists:
         print(f"   Assists: {', '.join(assists)}")
 
-    # Show updated standings
-    top_scorers = get_top_scorers(3)
+    top_scorers = utilities.get_top_scorers(3)
     print("   Top Scorers:")
     for i, player in enumerate(top_scorers):
         if player.goals > 0:
@@ -300,21 +336,23 @@ def on_player_joined(data):
 
     print(f"{username} joined (Team: {team})")
 
-    # Show team balance
-    balance = get_team_balance()
+    balance = utilities.get_team_balance()
     print(f"   Teams: Blue {balance['blue']} - Red {balance['red']}")
 
-# Register handlers
-register_goal_handler(on_goal_scored)
-register_player_join_handler(on_player_joined)
+utilities.register_goal_handler(on_goal_scored)
+utilities.register_player_join_handler(on_player_joined)
 
-start_server()
+bridge.start_server()
 ```
 
 ### Server Administration
 
 ```python
-from puck_bridge_py import *
+from puck_bridge_py import PuckBridge, Commands, Utilities
+
+bridge = PuckBridge()
+commands = Commands(bridge)
+utilities = Utilities(bridge)
 
 def admin_commands():
     while True:
@@ -322,48 +360,51 @@ def admin_commands():
 
         if command.startswith("kick "):
             username = command[5:]
-            if kick_player_by_name(username, "Kicked by admin"):
+            if commands.kick_player_by_name(username, "Kicked by admin"):
                 print(f"Kicked {username}")
             else:
                 print(f"Failed to kick {username}")
 
         elif command == "restart":
-            if restart_game("Game restarted by admin"):
+            if commands.restart_game("Game restarted by admin"):
                 print("Game restarted")
             else:
                 print("Failed to restart game")
 
         elif command.startswith("msg "):
             message = command[4:]
-            if send_system_message(f"[ADMIN] {message}"):
+            if commands.send_system_message(f"[ADMIN] {message}"):
                 print("Message sent")
             else:
                 print("Failed to send message")
 
         elif command == "players":
-            players = get_all_players()
+            players = utilities.get_all_players()
             for player in players.values():
                 print(f"  {player.username} (Team: {player.team}, Goals: {player.goals})")
 
         elif command == "quit":
             break
 
-# Run admin interface in background
+import threading
 threading.Thread(target=admin_commands, daemon=True).start()
-start_server()
+bridge.start_server()
 ```
 
 ### Performance Monitoring
 
 ```python
-from puck_bridge_py import *
+from puck_bridge_py import PuckBridge, Utilities
 import time
+
+bridge = PuckBridge()
+utilities = Utilities(bridge)
 
 def performance_monitor():
     while True:
-        if is_connected():
-            stats = get_performance_stats()
-            player_count = get_player_count()
+        if utilities.is_connected():
+            stats = utilities.get_performance_stats()
+            player_count = utilities.get_player_count()
 
             print(f"Performance: {stats['current_fps']:.1f} FPS "
                   f"(avg: {stats['average_fps']:.1f}) | "
@@ -371,8 +412,9 @@ def performance_monitor():
 
         time.sleep(5)
 
+import threading
 threading.Thread(target=performance_monitor, daemon=True).start()
-start_server()
+bridge.start_server()
 ```
 
 ## Event Data Structures
